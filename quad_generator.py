@@ -15,6 +15,7 @@ class QuadGenerator:
         new_quad = QuadTuple(self.nextquad, *args)
         self.nextquad += 1
         self.quads.append(new_quad)
+        return new_quad
 
     def print_quads(self):
         for quad in self.quads:

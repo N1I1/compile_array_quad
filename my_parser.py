@@ -2,11 +2,17 @@ from quad_generator import QuadGenerator
 from lexer import tokenize
 
 def width(ndim):
-    dims = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-    return dims[ndim]
+    return f'width_{ndim}'
+    dims = [i for i in range(6, 11)]
+    dims.reverse()
+    res = 1
+    for i in range(ndim):
+        res *= dims[i]
+    
+    return res
+
 def unit_size(ndim):
-    dims = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-    return dims[ndim]
+    return 'unit_size'
 
 class Parser:
     def __init__(self, code):
@@ -19,7 +25,7 @@ class Parser:
             and self.current_token[0] == expected_type:
             self.token_index += 1
         else:
-            raise RuntimeError(f"Expected {expected_type} but got {self.current_token}")
+            raise SyntaxError(f"Expected {expected_type} but got {self.current_token}")
     
     @property
     def next_token(self):
@@ -67,13 +73,10 @@ class Parser:
                 # lhs_addr = self.quad_gen.newtmp()
                 lhs_addr = self.quad_gen.newtmp()
                 self.quad_gen.gen('[]', id_token, array_list_offset , lhs_addr)
-                lhs_code = ''
-                # 暂省略
             else:
                 lhs_addr = id_token
                 lhs_ndim = 0
-                lhs_code = ''
-            return {'addr': lhs_addr, 'code': lhs_code, 'ndim': lhs_ndim}
+            return {'addr': lhs_addr, 'ndim': lhs_ndim}
         raise SyntaxError(f"Unexpected token {self.current_token} in LHS")
 
     def E_list(self):
@@ -86,12 +89,10 @@ class Parser:
                 e_list_ndim = e_list_tail_dic['ndim'] + 1
                 self.quad_gen.gen("*", e_dic['addr'], width(e_list_ndim), e_list_addr)
                 self.quad_gen.gen("+", e_list_addr, e_list_tail_dic['addr'], e_list_addr)
-                e_list_code = e_list_tail_dic['code']
             else:
                 e_list_addr = e_dic['addr']
-                e_list_code = e_dic['code']
                 e_list_ndim = 1
-            return {'addr': e_list_addr, 'code': e_list_code, 'ndim': e_list_ndim}
+            return {'addr': e_list_addr, 'ndim': e_list_ndim}
         raise SyntaxError('Syntax error in "[]"')
 
 
@@ -103,12 +104,10 @@ class Parser:
             new_t_dic = self.T()
             e_addr = self.quad_gen.newtmp()
             self.quad_gen.gen(current_token, t_dic['addr'], new_t_dic['addr'], e_addr)
-            t_dic = {'addr': e_addr, 'code': ''}
-            e_code = ''
+            t_dic = {'addr': e_addr}
             
-        e_code = t_dic['code']
         e_addr = t_dic['addr']
-        return {'addr': e_addr, 'code': e_code}
+        return {'addr': e_addr}
 
     def T(self):
         f_dic = self.F()
@@ -119,12 +118,10 @@ class Parser:
             new_f_dic = self.F()
             t_addr = self.quad_gen.newtmp()
             self.quad_gen.gen(current_token, f_dic['addr'], new_f_dic['addr'], t_addr)
-            f_dic = {'addr': t_addr, 'code': ''}
-            # t_code = f_dic['code'] + new_f_dic['code'] + self.quad_gen.gen(self.current_token[1], f_dic['addr'], new_f_dic['addr'], t_addr)
+            f_dic = {'addr': t_addr}
         # T -> F
         t_addr = f_dic['addr']
-        t_code = f_dic['code']
-        return {'addr': t_addr, 'code': t_code}
+        return {'addr': t_addr}
     
 
     def F(self):
@@ -134,7 +131,6 @@ class Parser:
             e_dic = self.E()
             self.match('RPAREN')
             f_addr = e_dic['addr']
-            f_code = e_dic['code']
         elif self.current_token[0] == 'ID':
             id_token = self.current_token[1]
             self.match('ID')
@@ -146,18 +142,15 @@ class Parser:
                 array_list_offset = self.quad_gen.newtmp()
                 self.quad_gen.gen("*", unit_size(e_list_dic['ndim']), e_list_dic['addr'], array_list_offset)
                 f_addr = self.quad_gen.newtmp()
-                f_code = e_list_dic['code']
                 self.quad_gen.gen("[]", id_token, array_list_offset, f_addr)
             # F -> id
             else:
                 f_addr = id_token
-                f_code = ''
         # F -> NUM
         elif self.current_token[0] == 'NUM':
             num_token = self.current_token[1]
             self.match('NUM')
             f_addr = num_token
-            f_code = ''
         else:
             raise SyntaxError(f"Unexpected token {self.current_token} in F")
-        return {'addr': f_addr, 'code': f_code}
+        return {'addr': f_addr}
